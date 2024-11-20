@@ -5,7 +5,7 @@
 # Date: 11/19/24
 # Student 1: Snehal Kumar
 # Student 2: Marley Zerr
-# Student 3: 
+# Student 3: Joseph Rivera
 # Student 4: 
 # Description: Implementation Basic Data Analysis Routines
 #############################################################
