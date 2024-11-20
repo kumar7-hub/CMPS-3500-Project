@@ -56,7 +56,7 @@ def loadData(dataset):
     return pd.read_csv(f"{dataset}")
 
 
-def dataCleaning(df):
+def cleanData(df):
     # Drop 'Name' column
     df.drop(columns = ['Name'], inplace = True)
     # Replace underscores with empty string in 'Age' column 
@@ -148,7 +148,7 @@ def main():
             # Performing data clean up
             current_time = pd.Timestamp.now()
             print(f"{current_time} Performing Data Clean Up")
-            df_cleaned = dataCleaning(df)
+            df_cleaned = cleanData(df)
             cleaning_time = pd.Timestamp.now() - current_time
 
             # Displaying total rows after cleaning 
