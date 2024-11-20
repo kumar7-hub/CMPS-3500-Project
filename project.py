@@ -65,7 +65,7 @@ def cleanData(df):
     df['Age'] = df['Age'].astype(int) 
     # Drop 'SSN' column
     df.drop(columns = ['SSN'], inplace = True)
-    # Replace underscores with empty string in 'Occupation' column
+    # Replace underscores with null in 'Occupation' column
     df['Occupation'][df['Occupation'] == '_______'] = np.nan
     # Replace underscores with empty string in 'Annual_Income' column
     df['Annual_Income'] = df['Annual_Income'].str.replace('_', '')
