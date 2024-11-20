@@ -52,6 +52,10 @@ from keras.models import Sequential
 from keras.layers import Dense
 
 
+def loadData(dataset):
+    return pd.read_csv(f"{dataset}")
+
+
 def dataCleaning(df):
     # Drop 'Name' column
     df.drop(columns = ['Name'], inplace = True)
@@ -121,7 +125,7 @@ def main():
             # Loading training data set
             current_time = pd.Timestamp.now()
             print(f"{current_time} Loading training data set")
-            df = pd.read_csv("credit_score_data.csv")
+            df = loadData("credit_score_data.csv")
             loading_time = pd.Timestamp.now() - current_time
 
             # Displaying total columns read
