@@ -51,6 +51,34 @@ from keras.utils import to_categorical
 from keras.models import Sequential
 from keras.layers import Dense
 
+def return_max_MAD(data, num_col, group_col = 'Customer_ID'):
+    '''Return max value of median absolute devaition(MAD) from within the customers for num_col'''
+    return (data.groupby(group_col)[num_col].agg(lambda x: (x - x.median()).abs().median())).max()
+
+def median_standardization(x, default_value):
+    '''Transform series or dataframe to its devaition from median with respect to Median absolute deviation(MAD) i.e. median standardization.'''
+    med = x.median() 
+    abs = (x - med).abs()
+    MAD = abs.median()
+    if MAD == 0:
+        if ((abs == 0).sum() == abs.notnull().sum()): # When MAD is zero and all non-null values are constant in x
+            return x * 0
+        else:
+            return (x - med)/default_value # When MAD is zero but all non-values are not same in x
+    else:
+        return (x - med)/MAD # When MAD is non-zero
+    
+def return_mode(x):
+    '''Return nan if no mode exists in given series or return minimum mode'''
+    modes = x.mode()
+    if len(modes) == 0:
+        return np.nan
+    return modes.min()
+    
+def forward_backward_fill(x):
+    '''Perform forward fill then backward fill on given series or dataframe'''
+    return x.fillna(method='ffill').fillna(method='bfill')
+
 
 def loadData(dataset):
     return pd.read_csv(f"{dataset}")
@@ -93,6 +121,63 @@ def cleanData(df):
     df['Monthly_Balance'][df['Monthly_Balance'] == '__-333333333333333333333333333__'] = np.nan # go back and check
     # Convert 'Monthly_Balance' column to float
     df['Monthly_Balance'] = df['Monthly_Balance'].astype(float)
+    # Drop 'ID' column
+    df.drop(columns = 'ID', inplace = True)
+    # Replace negative and high positive values above 100 to null in 'Age' column
+    df['Age'][(df['Age'] > 100) | (df['Age'] <= 0)] = np.nan
+    # Replace outliers with null in 'Age' column 
+    df['Age'][df.groupby('Customer_ID')['Age'].transform(median_standardization, default_value = return_max_MAD(df, 'Age')) > 80] = np.nan
+    # Fill missing values in 'Age' column
+    df['Age'] =  df.groupby('Customer_ID')['Age'].transform(forward_backward_fill).astype(int)
+    # Fill with same profession in 'Occupation' column
+    df['Occupation'] = df.groupby('Customer_ID')['Occupation'].transform(forward_backward_fill)
+    # Choose minumum mode where two modes exist for same monthly inhand salary 
+    df['Annual_Income'][df['Monthly_Inhand_Salary'].notnull()] = df[df['Monthly_Inhand_Salary'].notnull()].groupby(['Customer_ID', 'Monthly_Inhand_Salary'], group_keys = False)['Annual_Income'].transform(return_mode)
+    # Replace null values with nearby monthly inhand salary of a same annual income value in 'Monthly_Inhand_Salary column'
+    df['Monthly_Inhand_Salary'] = df.groupby(['Customer_ID', 'Annual_Income'], group_keys = False)['Monthly_Inhand_Salary'].transform(forward_backward_fill)
+    df['Annual_Income'][df['Monthly_Inhand_Salary'].isnull()] = np.nan
+    # Set 'Annual_Income' and 'Monthly_Inhand_Salary' column to null for particular customer
+    df.loc[[34042], ['Annual_Income', 'Monthly_Inhand_Salary']] = np.nan # go back and check
+    # Make data same 
+    df['Annual_Income'] = df.groupby('Customer_ID')['Annual_Income'].transform(forward_backward_fill)
+    df['Monthly_Inhand_Salary'] = df.groupby('Customer_ID')['Monthly_Inhand_Salary'].transform(forward_backward_fill)
+    # Replace negative values in 'Num_Bank_Accounts' column with null
+    df['Num_Bank_Accounts'][df['Num_Bank_Accounts'] < 0] = np.nan
+    # Replace large median standardization values with null in 'Num_Bank_Accounts' column
+    df['Num_Bank_Accounts'][df.groupby('Customer_ID')['Num_Bank_Accounts'].transform(median_standardization, default_value = return_max_MAD(df, 'Num_Bank_Accounts')).abs() > 2] = np.nan
+    # Fill missing values and covert to integer in 'Num_Bank_Accounts' column
+    df['Num_Bank_Accounts'] = df.groupby('Customer_ID')['Num_Bank_Accounts'].transform(forward_backward_fill).astype(int)
+    # Replace large median standardization values with null in 'Num_Credit_Card' column
+    df['Num_Credit_Card'][df.groupby('Customer_ID')['Num_Credit_Card'].transform(median_standardization, default_value = return_max_MAD(df, 'Num_Credit_Card')).abs() > 2] = np.nan
+    # Fill missing values and convert to integer in 'Num_Credit_Card' column
+    df['Num_Credit_Card'] = df.groupby('Customer_ID')['Num_Credit_Card'].transform(forward_backward_fill).astype(int)
+    # Fill customer's records with their median
+    df['Interest_Rate'] = df.groupby('Customer_ID')['Interest_Rate'].transform(lambda x: x.median())
+    # Fill 'Num_of_Loan' column with the number of loans
+    num_of_loans = df['Type_of_Loan'].str.split(', ').str.len()
+    df['Num_of_Loan'][num_of_loans.notnull()] = num_of_loans[num_of_loans.notnull()]
+    # Set to 0 if no loans
+    df['Num_of_Loan'][num_of_loans.isnull()] = 0
+    # Fill missing values and convert to integer in 'Num_of_Loan' column
+    df['Num_of_Loan'] = df.groupby('Customer_ID')['Num_of_Loan'].transform(forward_backward_fill).astype(int)
+    # Replace null values with 'No Loan' in 'Type_of_Loan' column
+    df['Type_of_Loan'].fillna('No Loan', inplace = True)
+    temp_series = df['Type_of_Loan']
+    # Number of loans
+    temp_lengths = temp_series.str.split(', ').str.len().astype(int)
+    temp_lengths_max = temp_lengths.max()
+    for index, val in temp_lengths.items():
+        temp_series[index] = (temp_lengths_max - val) * 'No Loan, ' + temp_series[index]
+        
+    temp = temp_series.str.split(pat = ', ', expand = True)
+    # unique_loans = set()
+    for col in temp.columns:
+        temp[col] = temp[col].str.lstrip('and ')
+        # unique_loans.update(temp[col].unique())
+    temp.columns = [f'Last_Loan_{i}' for i in range(int(df['Num_of_Loan'].max()), 0, -1)]
+    df = pd.merge(df, temp, left_index = True, right_index = True)
+    # Drop 'Type_of_Loan' column
+    df.drop(columns = 'Type_of_Loan', inplace = True)
 
     return df
 
