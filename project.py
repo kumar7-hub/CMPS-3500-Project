@@ -151,9 +151,9 @@ def cleanData(df):
     # Replace underscores with empty string in 'Amount_invested_monthly' column and convert to float
     df['Amount_invested_monthly'] = df['Amount_invested_monthly'].str.replace('_', '').astype(float)
     # Replace weird values with null in 'Payment_Behaviour' column
-    df['Payment_Behaviour'][df['Payment_Behaviour'] == '!@9#%8'] = np.nan # go back and check
+    df['Payment_Behaviour'][~df['Payment_Behaviour'].str.match('^[A-Za-z_]+$')] = np.nan
     # Replace invalid values with null in 'Monthly_Balance' column
-    df['Monthly_Balance'][df['Monthly_Balance'] == '__-333333333333333333333333333__'] = np.nan # go back and check
+    df['Monthly_Balance'][~df['Monthly_Balance'].astype(str).str.match('^[-+]?(\d*\.)?\d+$')] = np.nan
     # Convert 'Monthly_Balance' column to float
     df['Monthly_Balance'] = df['Monthly_Balance'].astype(float)
     # Drop 'ID' column
@@ -170,10 +170,12 @@ def cleanData(df):
     df['Annual_Income'][df['Monthly_Inhand_Salary'].notnull()] = df[df['Monthly_Inhand_Salary'].notnull()].groupby(['Customer_ID', 'Monthly_Inhand_Salary'], group_keys = False)['Annual_Income'].transform(return_mode)
     # Replace null values with nearby monthly inhand salary of a same annual income value in 'Monthly_Inhand_Salary column'
     df['Monthly_Inhand_Salary'] = df.groupby(['Customer_ID', 'Annual_Income'], group_keys = False)['Monthly_Inhand_Salary'].transform(forward_backward_fill)
+    # Set 'Annual_Income' and 'Monthly_Inhand_Salary' column to null for customers with large deviation from median
     df['Annual_Income'][df['Monthly_Inhand_Salary'].isnull()] = np.nan
-    # Set 'Annual_Income' and 'Monthly_Inhand_Salary' column to null for particular customer
-    df.loc[[34042], ['Annual_Income', 'Monthly_Inhand_Salary']] = np.nan # go back and check
-    # Make data same 
+    Annual_Income_deviation = df.groupby('Customer_ID', group_keys = False)['Annual_Income'].apply(lambda x: (x - x.median())/x.median())
+    indices = Annual_Income_deviation[Annual_Income_deviation > 500].index.tolist()
+    df.loc[indices, ['Annual_Income', 'Monthly_Inhand_Salary']] = np.nan
+    # Fill in missing values in 'Annual_Income' and 'Monthly_Inhand_Salary' columns 
     df['Annual_Income'] = df.groupby('Customer_ID')['Annual_Income'].transform(forward_backward_fill)
     df['Monthly_Inhand_Salary'] = df.groupby('Customer_ID')['Monthly_Inhand_Salary'].transform(forward_backward_fill)
     # Replace negative values in 'Num_Bank_Accounts' column with null
@@ -258,13 +260,13 @@ def cleanData(df):
     df['Amount_invested_monthly'] = df.groupby('Customer_ID')['Amount_invested_monthly'].transform(lambda x: x.fillna(x.median()))
     # Fill missing payment behaviors: use mode if customer has clear pattern, otherwise use forward/backward fill
     df['Payment_Behaviour'] = df.groupby('Customer_ID')['Payment_Behaviour'].transform(lambda x: return_mode(x) if len(x.mode()) == 1 else forward_backward_fill(x))
-    #Fills in null values with the median monthly balance of the customers other properly entered monthly balances
+    # Fill in null values with the median monthly balance of the customers other properly entered monthly balances
     df['Monthly_Balance'] = df.groupby('Customer_ID')['Monthly_Balance'].transform(lambda x: x.fillna(x.median()))
-    #Dropping month column
+    # Dropping month column
     df.drop(columns = ['Month'], inplace = True)
-    #shuffle data
+    # Shuffle data
     df = df.sample(frac = 1) 
-    #Rearranging the columns
+    # Rearranging the columns
     df = df.loc[:, ['Customer_ID', 'Age', 'Occupation', 'Annual_Income',
         'Monthly_Inhand_Salary', 'Num_Bank_Accounts', 'Num_Credit_Card',
         'Interest_Rate', 'Num_of_Loan', 'Delay_from_due_date',
