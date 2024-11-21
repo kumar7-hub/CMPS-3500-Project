@@ -51,6 +51,19 @@ from keras.utils import to_categorical
 from keras.models import Sequential
 from keras.layers import Dense
 
+def summarize_numerical_column_with_deviation(data, num_col, group_col = 'Customer_ID', absolute_summary = True, median_standardization_summary = False):
+    '''Summarize the numerical column and its median standardization based on customers using describe_numerical_column function.'''
+    Summary_dict = {}
+        
+    if median_standardization_summary == True:
+        default_MAD = return_max_MAD(data, num_col, group_col)
+        num_col_standardization = data.groupby(group_col)[num_col].apply(median_standardization, default_value = default_MAD)
+        # print(f'Median standardization for {num_col}:\n')
+        # Summary_dict[f'Median standardization of {num_col}'] = describe_numerical_column(num_col_standardization, f'Median standardization of {num_col}')
+        Summary_dict['Max. MAD'] = default_MAD
+
+    return Summary_dict
+
 def return_max_MAD(data, num_col, group_col = 'Customer_ID'):
     '''Return max value of median absolute devaition(MAD) from within the customers for num_col'''
     return (data.groupby(group_col)[num_col].agg(lambda x: (x - x.median()).abs().median())).max()
@@ -78,6 +91,28 @@ def return_mode(x):
 def forward_backward_fill(x):
     '''Perform forward fill then backward fill on given series or dataframe'''
     return x.fillna(method='ffill').fillna(method='bfill')
+
+def return_mode_median_filled_int(x):
+    '''Return back series by filling with mode(in case there is one mode) else fill with integer part of median'''
+    modes = x.mode()
+    if len(modes) == 1:
+        return x.fillna(modes[0])
+    else:
+        return x.fillna(int(modes.median()))
+    
+def return_mode_average_filled(x):
+    '''Return back series by filling with mode(in case there is one mode) else fill with average of modes'''
+    modes = x.mode()
+    if len(modes) == 1:
+        return x.fillna(modes[0])
+    else:
+        return x.fillna(modes.mean())
+    
+def fill_month_history(x):
+    '''Return months filled data for 8-months period'''
+    first_non_null_idx = x.argmin()
+    first_non_null_value = x.iloc[first_non_null_idx]
+    return pd.Series(first_non_null_value + np.array(range(-first_non_null_idx, 8-first_non_null_idx)), index = x.index)
 
 
 def loadData(dataset):
@@ -179,6 +214,69 @@ def cleanData(df):
     # Drop 'Type_of_Loan' column
     df.drop(columns = 'Type_of_Loan', inplace = True)
 
+    # No cleaning on Delay from due date
+
+    # Replace Num_of_Delayed_Payment with NaN if value is an outlier (above threshold) or negative
+    summary_num_delayed_payments = summarize_numerical_column_with_deviation(df, 'Num_of_Delayed_Payment', median_standardization_summary = True)
+    df['Num_of_Delayed_Payment'][(df['Num_of_Delayed_Payment'] > summary_num_delayed_payments['Num_of_Delayed_Payment']['Outlier upper range']) | (df['Num_of_Delayed_Payment'] < 0)] = np.nan
+    # Fill missing delayed payment counts using custom logic (mode with median fallback) for each customer, convert to integers
+    df['Num_of_Delayed_Payment'] = df.groupby('Customer_ID')['Num_of_Delayed_Payment'].transform(return_mode_median_filled_int).astype(int)
+    # Fill missing Changed_Credit_Limit values using custom logic (mode with average fallback) for each customer
+    df['Changed_Credit_Limit'] = df.groupby('Customer_ID')['Changed_Credit_Limit'].transform(return_mode_average_filled)
+    # Replace Num_Credit_Inquiries values with NaN if they are outliers (above upper threshold) or negative
+    summary_num_credit_inquiries = summarize_numerical_column_with_deviation(df, 'Num_Credit_Inquiries', median_standardization_summary = True)
+    df['Num_Credit_Inquiries'][(df['Num_Credit_Inquiries'] > summary_num_credit_inquiries['Num_Credit_Inquiries']['Outlier upper range']) | (df['Num_Credit_Inquiries'] < 0)] = np.nan
+    # Fill missing credit inquiry counts using forward/backward fill within customer groups, convert to integers
+    df['Num_Credit_Inquiries'] = df.groupby('Customer_ID')['Num_Credit_Inquiries'].transform(forward_backward_fill).astype(int)
+    # Fill missing Credit_Mix values using forward and backward fill within each customer group
+    df['Credit_Mix'] = df.groupby('Customer_ID')['Credit_Mix'].transform(forward_backward_fill)
+
+    # No nulls found in Outstanding debt so no cleaning
+    # Credit Utilization ratio does not have any cleaning done to it
+
+    # Extract years and months from 'Credit_History_Age' string (e.g., "5 Years and 3 Months") into separate numeric columns
+    df[['Years', 'Months']] = df['Credit_History_Age'].str.extract('(?P<Years>\d+) Years and (?P<Months>\d+) Months').astype(float)
+    # Convert separated years and months into total months of credit history
+    df['Credit_History_Age'] = df['Years'] * 12 + df['Months']
+    # Remove temporary Years and Months columns after combining them into Credit_History_Age
+    df.drop(columns = ['Years', 'Months'], inplace = True)
+    # Fill missing credit history durations using custom logic (fill_month_history) for each customer, convert to integers
+    df['Credit_History_Age'] = df.groupby('Customer_ID')['Credit_History_Age'].transform(fill_month_history).astype(int)
+    # Convert Payment_of_Min_Amount from categorical (Yes,No,NM) to numeric (1,0,NaN)
+    df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({'Yes': 1, 'No': 0, 'NM': np.nan})
+    # Fill missing 'Payment_of_Min_Amount' values with most frequent value (mode) for each customer
+    df['Payment_of_Min_Amount'] = df.groupby('Customer_ID')['Payment_of_Min_Amount'].transform(lambda x: x.fillna(x.mode()[0]))
+    # Convert Payment_of_Min_Amount from binary (1,0) to categorical (Yes,No)
+    df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({1: 'Yes', 0: 'No'})
+    # Replace EMI values with NaN where standardized deviation exceeds 10000 (extreme outliers)
+    deviation_total_emi = df.groupby('Customer_ID')['Total_EMI_per_month'].transform(median_standardization, default_value = return_max_MAD(df, 'Total_EMI_per_month'))
+    df['Total_EMI_per_month'][deviation_total_emi > 10000] = np.nan
+    # Replace outlier EMI values (above upper threshold) with NaN
+    summary_total_emi_per_month = summarize_numerical_column_with_deviation(df, 'Total_EMI_per_month', median_standardization_summary = True)
+    df['Total_EMI_per_month'][(df['Total_EMI_per_month'] > summary_total_emi_per_month['Total_EMI_per_month']['Outlier upper range'])] = np.nan
+    # Fill missing monthly investment amounts with the median value for each customer
+    df['Amount_invested_monthly'] = df.groupby('Customer_ID')['Amount_invested_monthly'].transform(lambda x: x.fillna(x.median()))
+    # Fill missing payment behaviors: use mode if customer has clear pattern, otherwise use forward/backward fill
+    df['Payment_Behaviour'] = df.groupby('Customer_ID')['Payment_Behaviour'].transform(lambda x: return_mode(x) if len(x.mode()) == 1 else forward_backward_fill(x))
+    #Fills in null values with the median monthly balance of the customers other properly entered monthly balances
+    df['Monthly_Balance'] = df.groupby('Customer_ID')['Monthly_Balance'].transform(lambda x: x.fillna(x.median()))
+    #Dropping month column
+    df.drop(columns = ['Month'], inplace = True)
+    #shuffle data
+    df = df.sample(frac = 1) 
+    #Rearranging the columns
+    df = df.loc[:, ['Customer_ID', 'Age', 'Occupation', 'Annual_Income',
+        'Monthly_Inhand_Salary', 'Num_Bank_Accounts', 'Num_Credit_Card',
+        'Interest_Rate', 'Num_of_Loan', 'Delay_from_due_date',
+        'Num_of_Delayed_Payment', 'Changed_Credit_Limit',
+        'Num_Credit_Inquiries', 'Credit_Mix', 'Outstanding_Debt',
+        'Credit_Utilization_Ratio', 'Credit_History_Age',
+        'Payment_of_Min_Amount', 'Total_EMI_per_month',
+        'Amount_invested_monthly', 'Payment_Behaviour', 'Monthly_Balance', 'Last_Loan_9', 'Last_Loan_8', 'Last_Loan_7',
+        'Last_Loan_6', 'Last_Loan_5', 'Last_Loan_4', 'Last_Loan_3',
+        'Last_Loan_2', 'Last_Loan_1',
+        'Credit_Score']]
+
     return df
 
 
@@ -265,62 +363,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-#No cleaning on Delay from due date
-
-# Replace Num_of_Delayed_Payment with NaN if value is an outlier (above threshold) or negative
-df['Num_of_Delayed_Payment'][(df['Num_of_Delayed_Payment'] > summary_num_delayed_payments['Num_of_Delayed_Payment']['Outlier upper range']) | (df['Num_of_Delayed_Payment'] < 0)] = np.nan
-# Fill missing delayed payment counts using custom logic (mode with median fallback) for each customer, convert to integers
-df['Num_of_Delayed_Payment'] = df.groupby('Customer_ID')['Num_of_Delayed_Payment'].transform(return_mode_median_filled_int).astype(int)
-# Fill missing Changed_Credit_Limit values using custom logic (mode with average fallback) for each customer
-df['Changed_Credit_Limit'] = df.groupby('Customer_ID')['Changed_Credit_Limit'].transform(return_mode_average_filled)
-# Replace Num_Credit_Inquiries values with NaN if they are outliers (above upper threshold) or negative
-df['Num_Credit_Inquiries'][(df['Num_Credit_Inquiries'] > summary_num_credit_inquiries['Num_Credit_Inquiries']['Outlier upper range']) | (df['Num_Credit_Inquiries'] < 0)] = np.nan
-# Fill missing credit inquiry counts using forward/backward fill within customer groups, convert to integers
-df['Num_Credit_Inquiries'] = df.groupby('Customer_ID')['Num_Credit_Inquiries'].transform(forward_backward_fill).astype(int)
-# Fill missing Credit_Mix values using forward and backward fill within each customer group
-df['Credit_Mix'] = df.groupby('Customer_ID')['Credit_Mix'].transform(forward_backward_fill)
-
-# No nulls found in Outstanding debt so no cleaning
-# Credit Utilization ratio does not have any cleaning done to it
-
-# Extract years and months from 'Credit_History_Age' string (e.g., "5 Years and 3 Months") into separate numeric columns
-df[['Years', 'Months']] = df['Credit_History_Age'].str.extract('(?P<Years>\d+) Years and (?P<Months>\d+) Months').astype(float)
-# Convert separated years and months into total months of credit history
-df['Credit_History_Age'] = df['Years'] * 12 + df['Months']
-# Remove temporary Years and Months columns after combining them into Credit_History_Age
-df.drop(columns = ['Years', 'Months'], inplace = True)
-# Fill missing credit history durations using custom logic (fill_month_history) for each customer, convert to integers
-df['Credit_History_Age'] = df.groupby('Customer_ID')['Credit_History_Age'].transform(fill_month_history).astype(int)
-# Convert Payment_of_Min_Amount from categorical (Yes,No,NM) to numeric (1,0,NaN)
-df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({'Yes': 1, 'No': 0, 'NM': np.nan})
-# Fill missing 'Payment_of_Min_Amount' values with most frequent value (mode) for each customer
-df['Payment_of_Min_Amount'] = df.groupby('Customer_ID')['Payment_of_Min_Amount'].transform(lambda x: x.fillna(x.mode()[0]))
-# Convert Payment_of_Min_Amount from binary (1,0) to categorical (Yes,No)
-df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({1: 'Yes', 0: 'No'})
-# Replace EMI values with NaN where standardized deviation exceeds 10000 (extreme outliers)
-df['Total_EMI_per_month'][deviation_total_emi > 10000] = np.nan
-# Replace outlier EMI values (above upper threshold) with NaN
-df['Total_EMI_per_month'][(df['Total_EMI_per_month'] > summary_total_emi_per_month['Total_EMI_per_month']['Outlier upper range'])] = np.nan
-# Fill missing monthly investment amounts with the median value for each customer
-df['Amount_invested_monthly'] = df.groupby('Customer_ID')['Amount_invested_monthly'].transform(lambda x: x.fillna(x.median()))
-# Fill missing payment behaviors: use mode if customer has clear pattern, otherwise use forward/backward fill
-df['Payment_Behaviour'] = df.groupby('Customer_ID')['Payment_Behaviour'].transform(lambda x: return_mode(x) if len(x.mode()) == 1 else forward_backward_fill(x))
-#Fills in null values with the median monthly balance of the customers other properly entered monthly balances
-df['Monthly_Balance'] = df.groupby('Customer_ID')['Monthly_Balance'].transform(lambda x: x.fillna(x.median()))
-#Dropping month column
-df.drop(columns = ['Month'], inplace = True)
-#shuffle data
-df = df.sample(frac = 1) 
-#Rearranging the columns
-df = df.loc[:, ['Customer_ID', 'Age', 'Occupation', 'Annual_Income',
-       'Monthly_Inhand_Salary', 'Num_Bank_Accounts', 'Num_Credit_Card',
-       'Interest_Rate', 'Num_of_Loan', 'Delay_from_due_date',
-       'Num_of_Delayed_Payment', 'Changed_Credit_Limit',
-       'Num_Credit_Inquiries', 'Credit_Mix', 'Outstanding_Debt',
-       'Credit_Utilization_Ratio', 'Credit_History_Age',
-       'Payment_of_Min_Amount', 'Total_EMI_per_month',
-       'Amount_invested_monthly', 'Payment_Behaviour', 'Monthly_Balance', 'Last_Loan_9', 'Last_Loan_8', 'Last_Loan_7',
-       'Last_Loan_6', 'Last_Loan_5', 'Last_Loan_4', 'Last_Loan_3',
-       'Last_Loan_2', 'Last_Loan_1',
-       'Credit_Score']]
