@@ -51,18 +51,18 @@ from keras.utils import to_categorical
 from keras.models import Sequential
 from keras.layers import Dense
 
-def summarize_numerical_column_with_deviation(data, num_col, group_col = 'Customer_ID', absolute_summary = True, median_standardization_summary = False):
-    '''Summarize the numerical column and its median standardization based on customers using describe_numerical_column function.'''
-    Summary_dict = {}
+# def summarize_numerical_column_with_deviation(data, num_col, group_col = 'Customer_ID', absolute_summary = True, median_standardization_summary = False):
+#     '''Summarize the numerical column and its median standardization based on customers using describe_numerical_column function.'''
+#     Summary_dict = {}
         
-    if median_standardization_summary == True:
-        default_MAD = return_max_MAD(data, num_col, group_col)
-        num_col_standardization = data.groupby(group_col)[num_col].apply(median_standardization, default_value = default_MAD)
-        # print(f'Median standardization for {num_col}:\n')
-        # Summary_dict[f'Median standardization of {num_col}'] = describe_numerical_column(num_col_standardization, f'Median standardization of {num_col}')
-        Summary_dict['Max. MAD'] = default_MAD
+#     if median_standardization_summary == True:
+#         default_MAD = return_max_MAD(data, num_col, group_col)
+#         # num_col_standardization = data.groupby(group_col)[num_col].apply(median_standardization, default_value = default_MAD)
+#         # print(f'Median standardization for {num_col}:\n')
+#         # Summary_dict[f'Median standardization of {num_col}'] = describe_numerical_column(num_col_standardization, f'Median standardization of {num_col}')
+#         Summary_dict['Max. MAD'] = default_MAD
 
-    return Summary_dict
+#     return Summary_dict
 
 def return_max_MAD(data, num_col, group_col = 'Customer_ID'):
     '''Return max value of median absolute devaition(MAD) from within the customers for num_col'''
@@ -217,15 +217,15 @@ def cleanData(df):
     # No cleaning on Delay from due date
 
     # Replace Num_of_Delayed_Payment with NaN if value is an outlier (above threshold) or negative
-    summary_num_delayed_payments = summarize_numerical_column_with_deviation(df, 'Num_of_Delayed_Payment', median_standardization_summary = True)
-    df['Num_of_Delayed_Payment'][(df['Num_of_Delayed_Payment'] > summary_num_delayed_payments['Num_of_Delayed_Payment']['Outlier upper range']) | (df['Num_of_Delayed_Payment'] < 0)] = np.nan
+    # summary_num_delayed_payments = summarize_numerical_column_with_deviation(df, 'Num_of_Delayed_Payment', median_standardization_summary = True)
+    # df['Num_of_Delayed_Payment'][(df['Num_of_Delayed_Payment'] > summary_num_delayed_payments['Num_of_Delayed_Payment']['Outlier upper range']) | (df['Num_of_Delayed_Payment'] < 0)] = np.nan
     # Fill missing delayed payment counts using custom logic (mode with median fallback) for each customer, convert to integers
     df['Num_of_Delayed_Payment'] = df.groupby('Customer_ID')['Num_of_Delayed_Payment'].transform(return_mode_median_filled_int).astype(int)
     # Fill missing Changed_Credit_Limit values using custom logic (mode with average fallback) for each customer
     df['Changed_Credit_Limit'] = df.groupby('Customer_ID')['Changed_Credit_Limit'].transform(return_mode_average_filled)
     # Replace Num_Credit_Inquiries values with NaN if they are outliers (above upper threshold) or negative
-    summary_num_credit_inquiries = summarize_numerical_column_with_deviation(df, 'Num_Credit_Inquiries', median_standardization_summary = True)
-    df['Num_Credit_Inquiries'][(df['Num_Credit_Inquiries'] > summary_num_credit_inquiries['Num_Credit_Inquiries']['Outlier upper range']) | (df['Num_Credit_Inquiries'] < 0)] = np.nan
+    # summary_num_credit_inquiries = summarize_numerical_column_with_deviation(df, 'Num_Credit_Inquiries', median_standardization_summary = True)
+    # df['Num_Credit_Inquiries'][(df['Num_Credit_Inquiries'] > summary_num_credit_inquiries['Num_Credit_Inquiries']['Outlier upper range']) | (df['Num_Credit_Inquiries'] < 0)] = np.nan
     # Fill missing credit inquiry counts using forward/backward fill within customer groups, convert to integers
     df['Num_Credit_Inquiries'] = df.groupby('Customer_ID')['Num_Credit_Inquiries'].transform(forward_backward_fill).astype(int)
     # Fill missing Credit_Mix values using forward and backward fill within each customer group
@@ -252,8 +252,8 @@ def cleanData(df):
     deviation_total_emi = df.groupby('Customer_ID')['Total_EMI_per_month'].transform(median_standardization, default_value = return_max_MAD(df, 'Total_EMI_per_month'))
     df['Total_EMI_per_month'][deviation_total_emi > 10000] = np.nan
     # Replace outlier EMI values (above upper threshold) with NaN
-    summary_total_emi_per_month = summarize_numerical_column_with_deviation(df, 'Total_EMI_per_month', median_standardization_summary = True)
-    df['Total_EMI_per_month'][(df['Total_EMI_per_month'] > summary_total_emi_per_month['Total_EMI_per_month']['Outlier upper range'])] = np.nan
+    # summary_total_emi_per_month = summarize_numerical_column_with_deviation(df, 'Total_EMI_per_month', median_standardization_summary = True)
+    # df['Total_EMI_per_month'][(df['Total_EMI_per_month'] > summary_total_emi_per_month['Total_EMI_per_month']['Outlier upper range'])] = np.nan
     # Fill missing monthly investment amounts with the median value for each customer
     df['Amount_invested_monthly'] = df.groupby('Customer_ID')['Amount_invested_monthly'].transform(lambda x: x.fillna(x.median()))
     # Fill missing payment behaviors: use mode if customer has clear pattern, otherwise use forward/backward fill
