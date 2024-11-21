@@ -158,7 +158,7 @@ def cleanData(df):
     df['Monthly_Balance'] = df['Monthly_Balance'].astype(float)
     # Drop 'ID' column
     df.drop(columns = 'ID', inplace = True)
-    # Replace negative and high positive values above 100 to null in 'Age' column
+    # Replace negative and high positive values below 0 and above 100 to null in 'Age' column
     df['Age'][(df['Age'] > 100) | (df['Age'] <= 0)] = np.nan
     # Replace outliers with null in 'Age' column 
     df['Age'][df.groupby('Customer_ID')['Age'].transform(median_standardization, default_value = return_max_MAD(df, 'Age')) > 80] = np.nan
