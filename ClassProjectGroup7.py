@@ -50,7 +50,7 @@ from tensorflow import keras
 # Keras
 from keras.utils import to_categorical
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Input
 
 
 # Return max value of median absolute devaition(MAD) from within the customers for num_col
@@ -267,15 +267,49 @@ def processData(df):
 
 
 def modelDetails(df):
-    # Dropping columns
-    columns_to_drop_unrelated = ['Customer_ID']
-    columns_to_drop_not_used= ['Num_Bank_Accounts', 'Num_of_Loan', 'Delay_from_due_date', 
-                               'Num_of_Delayed_Payment', 'Changed_Credit_Limit', 'Outstanding_Debt', 'Payment_of_Min_Amount', 'Num_Credit_Inquiries', 'Payment_of_Min_Amount', 'Total_EMI_per_month', 'Amount_invested_monthly', 'Credit_History_Age','Monthly_Balance', 'Payment_Behaviour']
-    df.drop(columns=columns_to_drop_unrelated + columns_to_drop_not_used, inplace=True)
-    
+    # Define the target variable that we want to predict
     target = ['Credit_Score']
-    continuous_features = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate', 'Credit_Utilization_Ratio'] 
-    categorical_features = ['Occupation', 'Credit_Mix']
+
+    # Define the continuous (numerical) input features for the model
+    continuous_features = [
+        #'Age',                       # Age of the customer
+        #'Annual_Income',             # Annual income of the customer
+        #'Monthly_Inhand_Salary',     # Monthly in-hand salary of the customer
+        #'Num_Bank_Accounts',         # Number of bank accounts the customer has
+        #'Num_Credit_Card',           # Number of credit cards the customer owns
+        #'Interest_Rate',             # Interest rate on the customer's loans
+        #'Num_of_Loan',               # Number of loans the customer has
+        #'Delay_from_due_date',       # Average delay in days for loan payments past the due date
+        #'Num_of_Delayed_Payment',    # Number of delayed payments
+        'Changed_Credit_Limit',      # Amount by which the credit limit was changed
+        #'Num_Credit_Inquiries',      # Number of credit inquiries
+        #'Outstanding_Debt',          # Total outstanding debt of the customer
+        #'Credit_Utilization_Ratio',  # Credit utilization ratio
+        #'Credit_History_Age',        # Age of the credit history in months
+        #'Total_EMI_per_month',       # Total EMI (Equated Monthly Installment) paid per month
+        'Amount_invested_monthly',   # Amount invested monthly by the customer
+        #'Monthly_Balance'            # Monthly balance remaining after expenses
+    ]
+
+    # This version of the code will take out some categorical features
+    # The model may benefit from having less features
+
+    # Define the categorical (string) input features for the model
+    categorical_features = [
+        #'Occupation',                # Occupation of the customer
+        'Credit_Mix',                # Mix of different types of credit
+        'Payment_of_Min_Amount',     # Whether the customer pays the minimum amount due
+        'Payment_Behaviour',         # General payment behaviour of the customer
+        #'Last_Loan_9',               # Status of the 9th last loan taken
+        #'Last_Loan_8',               # Status of the 8th last loan taken
+        #'Last_Loan_7',               # Status of the 7th last loan taken
+        #'Last_Loan_6',               # Status of the 6th last loan taken
+        #'Last_Loan_5',               # Status of the 5th last loan taken
+        'Last_Loan_4',               # Status of the 4th last loan taken
+        'Last_Loan_3',               # Status of the 3rd last loan taken
+        'Last_Loan_2',               # Status of the 2nd last loan taken
+        #'Last_Loan_1'                # Status of the most recent loan taken
+    ]
 
     # Encoder for input features and target
     encoder = OneHotEncoder(handle_unknown='ignore')
@@ -291,33 +325,54 @@ def modelDetails(df):
     encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
     df = pd.concat([df, encoded_target_df], axis=1)
 
-    # Constructing dataframe for modeling
-    features_for_model = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate',
-                        'Credit_Utilization_Ratio', 'Credit_Mix_Bad', 'Credit_Mix_Good', 'Credit_Mix_Standard', 'Occupation_Accountant', 'Occupation_Architect', 'Occupation_Developer', 'Occupation_Doctor', 'Occupation_Engineer', 'Occupation_Entrepreneur', 'Occupation_Journalist'
-                        'Occupation_Lawyer', 'Occupation_Manager', 'Occupation_Mechanic', 'Occupation_Media_Manager', 'Occupation_Musician', 'Occupation_Scientist', 'Occupation_Teacher', 'Occupation_Writer'
-                    ] 
+    # Encode variables to use in Neural Network
 
-    target_features = ['Credit_Score_Good', 'Credit_Score_Poor', 'Credit_Score_Standard']   
+    # Encoder for input features
+    encoder = OneHotEncoder(handle_unknown='ignore')
+    le = LabelEncoder()
 
-    # Defining input features and target
-    X = encoded_features.toarray()
+    # Encoding categorical features
+    encoded_features = encoder.fit_transform(df[categorical_features])
+    # Convert the encoded data back to a DataFrame:
+    encoded_df = pd.DataFrame(encoded_features.toarray(), columns=encoder.get_feature_names_out(categorical_features))
+    # joining dataframes 
+    df = pd.concat([df, encoded_df], axis=1)
+
+    # Encoding categorical features for target input
+    encoded_target = encoder.fit_transform(df[target])
+    # Convert the encoded data back to a DataFrame:
+    encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
+    # joining dataframes 
+    df = pd.concat([df, encoded_target_df], axis=1)
+
+    # Extract continuous features as a NumPy array
+    continuous_data = df[continuous_features].values
+
+    # Combine continuous data with encoded categorical features
+    combined_features = np.hstack((continuous_data, encoded_features.toarray()))
+
+    # Defining data sets
+    x = combined_features
     y = encoded_target.toarray()
 
-    # Splitting data into training and testing sets
+    # Basic train-test split
+    # 80% training and 20% test 
     indices = np.arange(len(df))
-    X_train, X_test, y_train, y_test, train_indices, test_indices = train_test_split(X, y, indices, test_size=0.20, random_state=42)
+    x_train, x_test, y_train, y_test, train_indices, test_indices = train_test_split(X, y, indices, test_size=0.20, random_state=42)
 
-    # Defining the model
+    # Neural Network Layer Setup
     model = keras.Sequential()
 
-    # Input layer
-    model.add(Dense(24, input_dim = X_train.shape[1], activation = 'relu'))
+    # Adding input model --> 133 input layers
+    model.add(Input(shape=(x_train.shape[1],)))
 
-    # Hidden layers 
-    model.add(keras.layers.Dense(48, activation="relu"))
-    model.add(keras.layers.Dense(96, activation="relu"))
-    model.add(keras.layers.Dense(96, activation="relu"))
-    model.add(keras.layers.Dense(48, activation="relu"))
+    # 6 hidden layers 
+    model.add(keras.layers.Dense(128, activation="relu"))
+    model.add(keras.layers.Dense(64, activation="relu"))
+    model.add(keras.layers.Dense(32, activation="relu"))
+    model.add(keras.layers.Dense(16, activation="relu"))
+    model.add(keras.layers.Dense(8, activation="relu"))
+    model.add(keras.layers.Dense(4, activation="relu"))
 
     # Output layer
     model.add(keras.layers.Dense(3, activation="softmax"))
@@ -327,7 +382,7 @@ def modelDetails(df):
               loss=tf.keras.losses.CategoricalCrossentropy(),
               metrics=['accuracy'])
     
-    return model, encoder, X_train, y_train, X_test, y_test, test_indices
+    return model, encoder, x_train, y_train, x_test, y_test, test_indices
     
 
 def testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices):
