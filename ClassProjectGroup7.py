@@ -325,25 +325,25 @@ def modelDetails(df):
     encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
     df = pd.concat([df, encoded_target_df], axis=1)
 
-    # Encode variables to use in Neural Network
+    # # Encode variables to use in Neural Network
 
-    # Encoder for input features
-    encoder = OneHotEncoder(handle_unknown='ignore')
-    le = LabelEncoder()
+    # # Encoder for input features
+    # encoder = OneHotEncoder(handle_unknown='ignore')
+    # le = LabelEncoder()
 
-    # Encoding categorical features
-    encoded_features = encoder.fit_transform(df[categorical_features])
-    # Convert the encoded data back to a DataFrame:
-    encoded_df = pd.DataFrame(encoded_features.toarray(), columns=encoder.get_feature_names_out(categorical_features))
-    # joining dataframes 
-    df = pd.concat([df, encoded_df], axis=1)
+    # # Encoding categorical features
+    # encoded_features = encoder.fit_transform(df[categorical_features])
+    # # Convert the encoded data back to a DataFrame:
+    # encoded_df = pd.DataFrame(encoded_features.toarray(), columns=encoder.get_feature_names_out(categorical_features))
+    # # joining dataframes 
+    # df = pd.concat([df, encoded_df], axis=1)
 
-    # Encoding categorical features for target input
-    encoded_target = encoder.fit_transform(df[target])
-    # Convert the encoded data back to a DataFrame:
-    encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
-    # joining dataframes 
-    df = pd.concat([df, encoded_target_df], axis=1)
+    # # Encoding categorical features for target input
+    # encoded_target = encoder.fit_transform(df[target])
+    # # Convert the encoded data back to a DataFrame:
+    # encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
+    # # joining dataframes 
+    # df = pd.concat([df, encoded_target_df], axis=1)
 
     # Extract continuous features as a NumPy array
     continuous_data = df[continuous_features].values
@@ -358,7 +358,7 @@ def modelDetails(df):
     # Basic train-test split
     # 80% training and 20% test 
     indices = np.arange(len(df))
-    x_train, x_test, y_train, y_test, train_indices, test_indices = train_test_split(X, y, indices, test_size=0.20, random_state=42)
+    x_train, x_test, y_train, y_test, train_indices, test_indices = train_test_split(x, y, indices, test_size=0.20, random_state=42)
 
     # Neural Network Layer Setup
     model = keras.Sequential()
