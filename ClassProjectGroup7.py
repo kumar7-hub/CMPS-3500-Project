@@ -387,7 +387,7 @@ def modelDetails(df):
 
 def testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices):
     # Train the model
-    model.fit(X_train, y_train, epochs = 12, batch_size = 20)
+    model.fit(X_train, y_train, epochs = 50, batch_size = 16)
 
     # Evaluate accuracy
     test_loss, test_acc = model.evaluate(X_test,  y_test, verbose=2)
