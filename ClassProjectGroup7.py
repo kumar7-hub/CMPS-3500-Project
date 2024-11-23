@@ -266,7 +266,7 @@ def processData(df):
     return df
 
 
-def modelDetails(df):
+def trainNeuralNetwork(df):
     # Dropping columns
     columns_to_drop_unrelated = ['Customer_ID']
     columns_to_drop_not_used= ['Num_Bank_Accounts', 'Num_of_Loan', 'Delay_from_due_date', 
@@ -327,21 +327,8 @@ def modelDetails(df):
               loss=tf.keras.losses.CategoricalCrossentropy(),
               metrics=['accuracy'])
     
-    return model, encoder, X_train, y_train, X_test, y_test, test_indices
-    
-
-def testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices):
     # Train the model
     model.fit(X_train, y_train, epochs = 12, batch_size = 20)
-
-    # Evaluate accuracy
-    test_loss, test_acc = model.evaluate(X_test,  y_test, verbose=2)
-
-    print(f"\n[{Timestamp.now().strftime('%H:%M:%S')}] Generating prediction using selected Neural Network")
-    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Size of training set: {len(X_train)}")
-    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Size of testing set: {len(X_test)}")
-    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model RSME: {math.sqrt(test_loss)}")
-    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Test accuracy: {test_acc}\n")
 
     # Make Predictions
     predictions = model.predict(X_test)
@@ -352,21 +339,35 @@ def testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices
 
     # Calculating performance of model
     metrics = calculate_performance_multiclass(y_tested, y_predicted)
+    print(f"\n[{Timestamp.now().strftime('%H:%M:%S')}] Model Accuracy: {metrics['accuracy']}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Precision: {metrics['precision']}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Recall: {metrics['recall']}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model f1_score: {metrics['f1_score']}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Confusion Matrix: {metrics['confusion_matrix']}\n")
+
+
+    return X_train, X_test, y_tested, y_predicted, test_indices
+    
+
+def generatePredictions(df, X_train, X_test, y_tested, y_predicted, test_indices):
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Generating prediction using selected Neural Network")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Size of training set: {len(X_train)}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Size of testing set: {len(X_test)}")
 
     # Save predictions to csv file containing columns 'ID' and 'Credit_Score'
     test_ids = df['ID'].iloc[test_indices]
     predictions_df = pd.DataFrame({'ID': test_ids, 'Credit_Score': y_predicted.ravel()})
-    predictions_df.to_csv('predictionClassProject1.csv', index=False)
+    predictions_df.to_csv('predictions.csv', index=False)
 
-    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Predictions generated ...\n")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Predictions generated (predictions.csv have been generated)....\n")
 
 
 
 def main():
     df = {}
-    model, encoder = None, None 
-    X_train, y_train, X_test, y_test, test_indices = None, None, None, None, None
+    X_train, X_test, y_tested, y_predicted, test_indices = None, None, None, None, None
     process_data = False
+    trainNN = False 
     option = 0
 
     while option != 5:
@@ -404,8 +405,8 @@ def main():
                 print("No data loaded. Please load data first.\n")
                 continue
 
-            print("Processing input data set:")
-            print("**************************")
+            print("Process (Clean) data:")
+            print("*********************")
 
             print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Performing Data Clean Up")
 
@@ -428,18 +429,11 @@ def main():
                 print("Data not processed. Please process data first.\n")
                 continue
 
-            print("Printing Model details:")
-            print("***********************")
+            print("Train NN:")
+            print("********")
 
-            model, encoder, X_train, y_train, X_test, y_test, test_indices = modelDetails(df)
-            
-            print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Hyper-parameters used are:")
-            print(f"\t   Number of hidden layers: 4")
-            print(f"\t   Neurons per Hidden Layer: 48, 96, 96, 48")
-            print(f"\t   Activation function: ReLU (hidden), Softmax (output)")
-            print(f"\t   Loss function: Categorical Crossentropy")
-            print(f"\t   Optimizer: Adam")
-            print(f"\t   Test size: 20%\n")
+            X_train, X_test, y_tested, y_predicted, test_indices = trainNeuralNetwork(df)
+            trainNN = True
 
         elif option == 4:
             if len(df) == 0:
@@ -448,20 +442,20 @@ def main():
             elif not process_data:
                 print("Data not processed. Please process data first.\n")
                 continue
-            elif model is None:
-                print("Model not built. Please build model first.\n")
+            elif not trainNN:
+                print("Nueral Network not trained. Please train NN first.\n")
                 continue
 
-            print("Testing Model:")
-            print("**************\n")
+            print("Generate Predictions:")
+            print("********************")
 
             # Generating predictions
-            testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices)
+            generatePredictions(df, X_train, X_test, y_tested, y_predicted, test_indices)
 
             df = {}
-            model, encoder = None, None 
-            X_train, y_train, X_test, y_test, test_indices = None, None, None, None, None
+            X_train, X_test, y_tested, y_predicted, test_indices = None, None, None, None, None
             process_data = False
+            trainNN = False
         
         else:
             if option != 5:
