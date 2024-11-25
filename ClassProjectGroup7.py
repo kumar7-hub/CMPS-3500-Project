@@ -282,8 +282,8 @@ def trainNeuralNetwork(df):
     le = LabelEncoder()
 
     # Encoding categorical features and converting to DataFrame
-    encoded_features = encoder.fit_transform(df[categorical_features])
-    encoded_df = pd.DataFrame(encoded_features.toarray(), columns=encoder.get_feature_names_out(categorical_features))    
+    categorical_encoded = encoder.fit_transform(df[categorical_features])
+    encoded_df = pd.DataFrame(categorical_encoded.toarray(), columns=encoder.get_feature_names_out(categorical_features))    
     df = pd.concat([df, encoded_df], axis=1)
 
     # Encoding target and converting to DataFrame
@@ -300,7 +300,7 @@ def trainNeuralNetwork(df):
     target_features = ['Credit_Score_Good', 'Credit_Score_Poor', 'Credit_Score_Standard']   
 
     # Defining input features and target
-    X = encoded_features.toarray()
+    X = categorical_encoded.toarray()
     y = encoded_target.toarray()
 
     # Splitting data into training and testing sets
