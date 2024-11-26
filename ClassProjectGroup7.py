@@ -282,11 +282,8 @@ def trainNeuralNetwork(df):
     df.drop(columns=columns_to_drop_unrelated, inplace=True)
 
     continuous_features = [
-        'Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card',
-        'Interest_Rate', 'Credit_Utilization_Ratio', 'Credit_History_Age',
-        'Total_EMI_per_month', 'Amount_invested_monthly', 'Monthly_Balance',
-        'Outstanding_Debt', 'Changed_Credit_Limit', 'Num_Credit_Inquiries',
-        'Num_Bank_Accounts', 'Num_of_Loan', 'Num_of_Delayed_Payment',
+        'Num_Credit_Card', 'Credit_Utilization_Ratio', 'Credit_History_Age',
+        'Outstanding_Debt', 'Num_of_Loan', 'Num_of_Delayed_Payment',
         'Delay_from_due_date'
     ]
     
@@ -296,8 +293,7 @@ def trainNeuralNetwork(df):
         'Last_Loan_6', 'Last_Loan_7', 'Last_Loan_8', 'Last_Loan_9'
     ]
 
-    encoded_features = ['Occupation', 'Credit_Mix', 'Payment_of_Min_Amount', 
-                        'Payment_Behaviour', 'Last_Loan_1', 'Last_Loan_2']
+    encoded_features = categorical_features
 
     target = ['Credit_Score']
 
@@ -306,8 +302,8 @@ def trainNeuralNetwork(df):
         df[feature] = df[feature].fillna('Unknown')
 
     # Scaling continuous features
-    # scaler = MinMaxScaler()
-    # df[continuous_features] = scaler.fit_transform(df[continuous_features])
+    scaler = MinMaxScaler()
+    df[continuous_features] = scaler.fit_transform(df[continuous_features])
 
     # Encoder for input features and target
     encoder = OneHotEncoder(handle_unknown='ignore')
@@ -324,12 +320,6 @@ def trainNeuralNetwork(df):
     df = pd.concat([df, encoded_target_df], axis=1)
 
     # print(df.info())
-
-    # Constructing dataframe for modeling
-    # features_for_model = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate',
-    #                     'Credit_Utilization_Ratio', 'Credit_Mix_Bad', 'Credit_Mix_Good', 'Credit_Mix_Standard', 'Occupation_Accountant', 'Occupation_Architect', 'Occupation_Developer', 'Occupation_Doctor', 'Occupation_Engineer', 'Occupation_Entrepreneur', 'Occupation_Journalist'
-    #                     'Occupation_Lawyer', 'Occupation_Manager', 'Occupation_Mechanic', 'Occupation_Media_Manager', 'Occupation_Musician', 'Occupation_Scientist', 'Occupation_Teacher', 'Occupation_Writer'
-    #                 ] 
 
     features_for_model = list(encoded_categorical_df.columns)
 
@@ -351,20 +341,20 @@ def trainNeuralNetwork(df):
     model = keras.Sequential()
 
     # Input layer
-    # model.add(Dense(128, input_dim = X_train.shape[1], activation = 'relu'))
     model.add(Input(shape=(X_train.shape[1],)))
 
     # Hidden layers 
-    # model.add(keras.layers.Dense(48, activation="relu"))
-    # model.add(keras.layers.Dense(96, activation="relu"))
-    # model.add(keras.layers.Dense(96, activation="relu"))
-    # model.add(keras.layers.Dense(48, activation="relu"))
+    # model.add(keras.layers.Dense(128, activation="relu"))
+    # model.add(keras.layers.Dense(64, activation="relu"))
+    # model.add(keras.layers.Dense(32, activation="relu"))
+    # model.add(keras.layers.Dense(16, activation="relu"))
+    # model.add(keras.layers.Dense(8, activation="relu"))
+    # model.add(keras.layers.Dense(4, activation="relu"))
+    
+    model.add(keras.layers.Dense(512, activation="relu"))
+    model.add(keras.layers.Dense(256, activation="relu"))
     model.add(keras.layers.Dense(128, activation="relu"))
-    model.add(keras.layers.Dense(64, activation="relu"))
-    model.add(keras.layers.Dense(32, activation="relu"))
-    model.add(keras.layers.Dense(16, activation="relu"))
-    model.add(keras.layers.Dense(8, activation="relu"))
-    model.add(keras.layers.Dense(4, activation="relu"))
+    model.add(keras.layers.Dense(3, activation="relu"))
 
     # Output layer
     model.add(keras.layers.Dense(3, activation="softmax"))
