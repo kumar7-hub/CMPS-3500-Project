@@ -186,6 +186,12 @@ def processData(df):
     temp.columns = [f'Last_Loan_{i}' for i in range(int(df['Num_of_Loan'].max()), 0, -1)]
     df = pd.merge(df, temp, left_index = True, right_index = True)
     df.drop(columns = 'Type_of_Loan', inplace = True)
+
+    # Cleaning 'Last_Loan' columns
+    for i in range(1, 10):
+        df[f'Last_Loan_{i}'] = df[f'Last_Loan_{i}'].astype("string")
+        df[f'Last_Loan_{i}'][df[f'Last_Loan_{i}'] == 'No Loan'] = np.nan
+        df[f'Last_Loan_{i}'] = df.groupby('Customer_ID')[f'Last_Loan_{i}'].transform(forward_backward_fill).astype("string")
     
     # Cleaning 'Num_of_Delayed_Payment' column
     df['Num_of_Delayed_Payment'] = df['Num_of_Delayed_Payment'].str.replace('_', '').astype(float)
@@ -210,6 +216,7 @@ def processData(df):
     # Cleaning 'Payment_Behaviour' column
     df['Payment_Behaviour'][~df['Payment_Behaviour'].str.match('^[A-Za-z_]+$')] = np.nan
     df['Payment_Behaviour'] = df.groupby('Customer_ID')['Payment_Behaviour'].transform(lambda x: return_mode(x) if len(x.mode()) == 1 else forward_backward_fill(x))
+    df['Payment_Behaviour'] = df['Payment_Behaviour'].astype("string")
     
     # Cleaning 'Monthly_Balance' column
     df['Monthly_Balance'][~df['Monthly_Balance'].astype(str).str.match('^[-+]?(\d*\.)?\d+$')] = np.nan
@@ -241,6 +248,7 @@ def processData(df):
     df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({'Yes': 1, 'No': 0, 'NM': np.nan})
     df['Payment_of_Min_Amount'] = df.groupby('Customer_ID')['Payment_of_Min_Amount'].transform(lambda x: x.fillna(x.mode()[0]))
     df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].map({1: 'Yes', 0: 'No'})
+    df['Payment_of_Min_Amount'] = df['Payment_of_Min_Amount'].astype("string")
     
     # Cleaning 'Total_EMI_per_month' column
     deviation_total_emi = df.groupby('Customer_ID')['Total_EMI_per_month'].transform(median_standardization, default_value=return_max_MAD(df, 'Total_EMI_per_month'))
@@ -262,6 +270,8 @@ def processData(df):
                     'Last_Loan_9', 'Last_Loan_8', 'Last_Loan_7', 'Last_Loan_6',
                     'Last_Loan_5', 'Last_Loan_4', 'Last_Loan_3', 'Last_Loan_2',
                     'Last_Loan_1', 'Credit_Score']]
+
+    # df.to_csv("Credit_score_cleaned_data.csv", index = False)
     
     return df
 
@@ -269,39 +279,60 @@ def processData(df):
 def trainNeuralNetwork(df):
     # Dropping columns
     columns_to_drop_unrelated = ['Customer_ID']
-    columns_to_drop_not_used= ['Num_Bank_Accounts', 'Num_of_Loan', 'Delay_from_due_date', 
-                               'Num_of_Delayed_Payment', 'Changed_Credit_Limit', 'Outstanding_Debt', 'Payment_of_Min_Amount', 'Num_Credit_Inquiries', 'Payment_of_Min_Amount', 'Total_EMI_per_month', 'Amount_invested_monthly', 'Credit_History_Age','Monthly_Balance', 'Payment_Behaviour']
-    df.drop(columns=columns_to_drop_unrelated + columns_to_drop_not_used, inplace=True)
+    df.drop(columns=columns_to_drop_unrelated, inplace=True)
+
+    continuous_features = [
+        'Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card',
+        'Interest_Rate', 'Credit_Utilization_Ratio', 'Credit_History_Age',
+        'Total_EMI_per_month', 'Amount_invested_monthly', 'Monthly_Balance',
+        'Outstanding_Debt', 'Changed_Credit_Limit', 'Num_Credit_Inquiries',
+        'Num_Bank_Accounts', 'Num_of_Loan', 'Num_of_Delayed_Payment',
+        'Delay_from_due_date'
+    ]
     
+    categorical_features = [
+        'Credit_Mix'
+    ]
+
     target = ['Credit_Score']
-    continuous_features = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate', 'Credit_Utilization_Ratio'] 
-    categorical_features = ['Occupation', 'Credit_Mix']
+
+    # Scaling continuous features
+    scaler = MinMaxScaler()
+    df[continuous_features] = scaler.fit_transform(df[continuous_features])
 
     # Encoder for input features and target
     encoder = OneHotEncoder(handle_unknown='ignore')
     le = LabelEncoder()
 
     # Encoding categorical features and converting to DataFrame
-    categorical_encoded = encoder.fit_transform(df[categorical_features])
-    encoded_df = pd.DataFrame(categorical_encoded.toarray(), columns=encoder.get_feature_names_out(categorical_features))    
-    df = pd.concat([df, encoded_df], axis=1)
+    encoded_categorical = encoder.fit_transform(df[categorical_features])
+    encoded_categorical_df = pd.DataFrame(encoded_categorical.toarray(), columns=encoder.get_feature_names_out(categorical_features))    
+    df = pd.concat([df, encoded_categorical_df], axis=1)
 
     # Encoding target and converting to DataFrame
     encoded_target = encoder.fit_transform(df[target])
     encoded_target_df = pd.DataFrame(encoded_target.toarray(), columns=encoder.get_feature_names_out(target))
     df = pd.concat([df, encoded_target_df], axis=1)
 
+    # print(df.info())
+
     # Constructing dataframe for modeling
-    features_for_model = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate',
-                        'Credit_Utilization_Ratio', 'Credit_Mix_Bad', 'Credit_Mix_Good', 'Credit_Mix_Standard', 'Occupation_Accountant', 'Occupation_Architect', 'Occupation_Developer', 'Occupation_Doctor', 'Occupation_Engineer', 'Occupation_Entrepreneur', 'Occupation_Journalist'
-                        'Occupation_Lawyer', 'Occupation_Manager', 'Occupation_Mechanic', 'Occupation_Media_Manager', 'Occupation_Musician', 'Occupation_Scientist', 'Occupation_Teacher', 'Occupation_Writer'
-                    ] 
+    # features_for_model = ['Age', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Credit_Card', 'Interest_Rate',
+    #                     'Credit_Utilization_Ratio', 'Credit_Mix_Bad', 'Credit_Mix_Good', 'Credit_Mix_Standard', 'Occupation_Accountant', 'Occupation_Architect', 'Occupation_Developer', 'Occupation_Doctor', 'Occupation_Engineer', 'Occupation_Entrepreneur', 'Occupation_Journalist'
+    #                     'Occupation_Lawyer', 'Occupation_Manager', 'Occupation_Mechanic', 'Occupation_Media_Manager', 'Occupation_Musician', 'Occupation_Scientist', 'Occupation_Teacher', 'Occupation_Writer'
+    #                 ] 
+
+    features_for_model = list(encoded_categorical_df.columns)
+
+    # for feature in features_for_model:
+    #     print(feature)
+    # print("\n")
 
     target_features = ['Credit_Score_Good', 'Credit_Score_Poor', 'Credit_Score_Standard']   
 
     # Defining input features and target
-    X = categorical_encoded.toarray()
-    y = encoded_target.toarray()
+    X = df[features_for_model].values
+    y = df[target_features].values
 
     # Splitting data into training and testing sets
     indices = np.arange(len(df))
@@ -311,7 +342,7 @@ def trainNeuralNetwork(df):
     model = keras.Sequential()
 
     # Input layer
-    model.add(Dense(24, input_dim = X_train.shape[1], activation = 'relu'))
+    model.add(Dense(128, input_dim = X_train.shape[1], activation = 'relu'))
 
     # Hidden layers 
     model.add(keras.layers.Dense(48, activation="relu"))
@@ -391,6 +422,7 @@ def main():
             # Loading training data set
             start_time = Timestamp.now()
             df = loadData("credit_score_data.csv")
+            # df = loadData("Credit_score_cleaned_data.csv")
             loading_time = (Timestamp.now() - start_time).total_seconds()
 
             # Displaying total columns read
