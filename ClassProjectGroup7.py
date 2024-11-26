@@ -50,7 +50,7 @@ from tensorflow import keras
 # Keras
 from keras.utils import to_categorical
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Input
 
 
 # Return max value of median absolute devaition(MAD) from within the customers for num_col
@@ -291,22 +291,31 @@ def trainNeuralNetwork(df):
     ]
     
     categorical_features = [
-        'Credit_Mix'
+        'Occupation', 'Credit_Mix', 'Payment_of_Min_Amount', 'Payment_Behaviour',
+        'Last_Loan_1', 'Last_Loan_2', 'Last_Loan_3', 'Last_Loan_4', 'Last_Loan_5',
+        'Last_Loan_6', 'Last_Loan_7', 'Last_Loan_8', 'Last_Loan_9'
     ]
+
+    encoded_features = ['Occupation', 'Credit_Mix', 'Payment_of_Min_Amount', 
+                        'Payment_Behaviour', 'Last_Loan_1', 'Last_Loan_2']
 
     target = ['Credit_Score']
 
+    # Fill NA values before encoding
+    for feature in encoded_features:
+        df[feature] = df[feature].fillna('Unknown')
+
     # Scaling continuous features
-    scaler = MinMaxScaler()
-    df[continuous_features] = scaler.fit_transform(df[continuous_features])
+    # scaler = MinMaxScaler()
+    # df[continuous_features] = scaler.fit_transform(df[continuous_features])
 
     # Encoder for input features and target
     encoder = OneHotEncoder(handle_unknown='ignore')
     le = LabelEncoder()
 
     # Encoding categorical features and converting to DataFrame
-    encoded_categorical = encoder.fit_transform(df[categorical_features])
-    encoded_categorical_df = pd.DataFrame(encoded_categorical.toarray(), columns=encoder.get_feature_names_out(categorical_features))    
+    encoded_categorical = encoder.fit_transform(df[encoded_features])
+    encoded_categorical_df = pd.DataFrame(encoded_categorical.toarray(), columns=encoder.get_feature_names_out(encoded_features))    
     df = pd.concat([df, encoded_categorical_df], axis=1)
 
     # Encoding target and converting to DataFrame
@@ -342,13 +351,20 @@ def trainNeuralNetwork(df):
     model = keras.Sequential()
 
     # Input layer
-    model.add(Dense(128, input_dim = X_train.shape[1], activation = 'relu'))
+    # model.add(Dense(128, input_dim = X_train.shape[1], activation = 'relu'))
+    model.add(Input(shape=(X_train.shape[1],)))
 
     # Hidden layers 
-    model.add(keras.layers.Dense(48, activation="relu"))
-    model.add(keras.layers.Dense(96, activation="relu"))
-    model.add(keras.layers.Dense(96, activation="relu"))
-    model.add(keras.layers.Dense(48, activation="relu"))
+    # model.add(keras.layers.Dense(48, activation="relu"))
+    # model.add(keras.layers.Dense(96, activation="relu"))
+    # model.add(keras.layers.Dense(96, activation="relu"))
+    # model.add(keras.layers.Dense(48, activation="relu"))
+    model.add(keras.layers.Dense(128, activation="relu"))
+    model.add(keras.layers.Dense(64, activation="relu"))
+    model.add(keras.layers.Dense(32, activation="relu"))
+    model.add(keras.layers.Dense(16, activation="relu"))
+    model.add(keras.layers.Dense(8, activation="relu"))
+    model.add(keras.layers.Dense(4, activation="relu"))
 
     # Output layer
     model.add(keras.layers.Dense(3, activation="softmax"))
@@ -359,7 +375,8 @@ def trainNeuralNetwork(df):
               metrics=['accuracy'])
     
     # Train the model
-    model.fit(X_train, y_train, epochs = 12, batch_size = 20)
+    # model.fit(X_train, y_train, epochs = 12, batch_size = 20)
+    model.fit(X_train, y_train, epochs = 50, batch_size = 25)
 
     # Make Predictions
     predictions = model.predict(X_test)
