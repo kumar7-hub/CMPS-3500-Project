@@ -281,13 +281,13 @@ def modelDetails(df):
         #'Num_of_Loan',               # Number of loans the customer has
         #'Delay_from_due_date',       # Average delay in days for loan payments past the due date
         #'Num_of_Delayed_Payment',    # Number of delayed payments
-        'Changed_Credit_Limit',      # Amount by which the credit limit was changed
+        #'Changed_Credit_Limit',      # Amount by which the credit limit was changed
         #'Num_Credit_Inquiries',      # Number of credit inquiries
         #'Outstanding_Debt',          # Total outstanding debt of the customer
         #'Credit_Utilization_Ratio',  # Credit utilization ratio
         #'Credit_History_Age',        # Age of the credit history in months
         #'Total_EMI_per_month',       # Total EMI (Equated Monthly Installment) paid per month
-        'Amount_invested_monthly',   # Amount invested monthly by the customer
+        #'Amount_invested_monthly',   # Amount invested monthly by the customer
         #'Monthly_Balance'            # Monthly balance remaining after expenses
     ]
 
@@ -296,7 +296,7 @@ def modelDetails(df):
 
     # Define the categorical (string) input features for the model
     categorical_features = [
-        #'Occupation',                # Occupation of the customer
+        'Occupation',                # Occupation of the customer
         'Credit_Mix',                # Mix of different types of credit
         'Payment_of_Min_Amount',     # Whether the customer pays the minimum amount due
         'Payment_Behaviour',         # General payment behaviour of the customer
@@ -305,10 +305,10 @@ def modelDetails(df):
         #'Last_Loan_7',               # Status of the 7th last loan taken
         #'Last_Loan_6',               # Status of the 6th last loan taken
         #'Last_Loan_5',               # Status of the 5th last loan taken
-        'Last_Loan_4',               # Status of the 4th last loan taken
-        'Last_Loan_3',               # Status of the 3rd last loan taken
+        #'Last_Loan_4',               # Status of the 4th last loan taken
+        #'Last_Loan_3',               # Status of the 3rd last loan taken
         'Last_Loan_2',               # Status of the 2nd last loan taken
-        #'Last_Loan_1'                # Status of the most recent loan taken
+        'Last_Loan_1'                # Status of the most recent loan taken
     ]
 
     # Encoder for input features and target
@@ -387,7 +387,7 @@ def modelDetails(df):
 
 def testModel(df, model, encoder, X_train, y_train, X_test, y_test, test_indices):
     # Train the model
-    model.fit(X_train, y_train, epochs = 50, batch_size = 16)
+    model.fit(X_train, y_train, epochs = 50, batch_size = 25)
 
     # Evaluate accuracy
     test_loss, test_acc = model.evaluate(X_test,  y_test, verbose=2)
