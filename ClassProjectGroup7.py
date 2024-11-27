@@ -130,7 +130,7 @@ def calculate_performance_multiclass(y_true, y_pred):
 
 
 def loadData(dataset):
-    return pd.read_csv(f"{dataset}")
+    return pd.read_csv(dataset)
 
 
 def processData(df):
@@ -344,13 +344,6 @@ def trainNeuralNetwork(df):
     model.add(Input(shape=(X_train.shape[1],)))
 
     # Hidden layers 
-    # model.add(keras.layers.Dense(128, activation="relu"))
-    # model.add(keras.layers.Dense(64, activation="relu"))
-    # model.add(keras.layers.Dense(32, activation="relu"))
-    # model.add(keras.layers.Dense(16, activation="relu"))
-    # model.add(keras.layers.Dense(8, activation="relu"))
-    # model.add(keras.layers.Dense(4, activation="relu"))
-    
     model.add(keras.layers.Dense(512, activation="relu"))
     model.add(keras.layers.Dense(256, activation="relu"))
     model.add(keras.layers.Dense(128, activation="relu"))
@@ -365,7 +358,6 @@ def trainNeuralNetwork(df):
               metrics=['accuracy'])
     
     # Train the model
-    # model.fit(X_train, y_train, epochs = 12, batch_size = 20)
     model.fit(X_train, y_train, epochs = 50, batch_size = 25)
 
     # Make Predictions
@@ -420,7 +412,31 @@ def main():
         print()
 
         if option == 1:
-            print("Loading input data set:")
+            file_option = 0
+            load_file = None
+
+            directory_path = os.getcwd()
+            files = os.listdir(directory_path)
+            csv_files = [file for file in files if file.endswith('.csv')]
+
+            if len(csv_files) == 0:
+                print("No CSV files found in current directory. Please add a CSV file to the directory.\n")
+                continue
+
+            # sort files alphabetically
+            csv_files.sort()
+
+            # print files in current directory
+            print("Available CSV files:")
+            print("********************")
+
+            for i, file in enumerate(csv_files):
+                print(f"({i+1}) {file}")
+
+            file_option = int(input("\nSelect a CSV file to load: "))
+            load_file = csv_files[file_option - 1]
+
+            print("\nLoading input data set:")
             print("***********************")
 
             print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Starting Script")
@@ -428,8 +444,7 @@ def main():
 
             # Loading training data set
             start_time = Timestamp.now()
-            df = loadData("credit_score_data.csv")
-            # df = loadData("Credit_score_cleaned_data.csv")
+            df = loadData(load_file)
             loading_time = (Timestamp.now() - start_time).total_seconds()
 
             # Displaying total columns read
@@ -500,9 +515,10 @@ def main():
             if option != 5:
                 print("Invalid option. Please try again.\n")
 
+    print("Exiting program....\n")
+
 
             
-
 
 
 if __name__ == '__main__':
