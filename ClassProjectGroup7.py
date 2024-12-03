@@ -347,7 +347,7 @@ def trainNeuralNetwork(df):
     model.add(keras.layers.Dense(512, activation="relu"))
     model.add(keras.layers.Dense(256, activation="relu"))
     model.add(keras.layers.Dense(128, activation="relu"))
-    model.add(keras.layers.Dense(3, activation="relu"))
+    model.add(keras.layers.Dense(64, activation="relu"))
 
     # Output layer
     model.add(keras.layers.Dense(3, activation="softmax"))
