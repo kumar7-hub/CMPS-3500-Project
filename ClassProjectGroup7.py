@@ -21,10 +21,6 @@ from pandas import Timestamp
 import numpy as np
 from tabulate import tabulate
 
-# visualization libraries
-# from matplotlib import pyplot as plt
-# import seaborn as sns
-
 # extra libraries
 import warnings
 warnings.filterwarnings('ignore')
@@ -129,13 +125,48 @@ def calculate_performance_multiclass(y_true, y_pred):
     return metrics
 
 
-def loadData(dataset):
-    return pd.read_csv(dataset)
+def loadData(dataset, total_columns = 28):
+    try: 
+        expected_columns = [
+            'ID', 'Customer_ID', 'Month', 'Name', 'Age', 'SSN', 'Occupation', 'Annual_Income', 'Monthly_Inhand_Salary', 'Num_Bank_Accounts', 'Num_Credit_Card', 'Interest_Rate', 
+            'Num_of_Loan', 'Type_of_Loan', 'Delay_from_due_date', 'Num_of_Delayed_Payment', 'Changed_Credit_Limit', 'Num_Credit_Inquiries', 'Credit_Mix', 'Outstanding_Debt', 'Credit_Utilization_Ratio', 'Credit_History_Age', 'Payment_of_Min_Amount', 'Total_EMI_per_month', 'Amount_invested_monthly', 'Payment_Behaviour', 'Monthly_Balance', 'Credit_Score'
+        ]
+
+        columns_not_found = []
+
+        df = pd.read_csv(dataset)
+
+        if 'Unnamed: 0' in df.columns:
+            df.drop(columns = ['Unnamed: 0'], inplace = True)
+
+        # Check if dataset contains expected columns
+        for column in expected_columns:
+            if column not in df.columns:
+                columns_not_found.append(column)
+        
+        # Check if dataset has total number of columns
+        if len(df.columns) != total_columns:
+            raise ValueError(f"Dataset should have {total_columns} columns, but has {len(df.columns)}. Please load another dataset.")
+
+        if columns_not_found:
+            raise ValueError(f"Columns not found in dataset: {', '.join(columns_not_found)}\nPlease load another dataset.")
+
+        return df
+
+    except FileNotFoundError:
+        print(f"\nThe file '{dataset}' was not found.\n")
+        return {}
+    except ValueError as e:
+        print(f"\n{e}\n")
+        return {}
+    except Exception as e:
+        print(f"\nAn error occurred while loading the file '{dataset}': {e}\n")
+        return {}
 
 
 def processData(df):
     # Dropping unnecessary columns
-    df.drop(columns = ['Unnamed: 0', 'Name', 'Month', 'SSN'], inplace = True)
+    df.drop(columns = ['Name', 'Month', 'SSN'], inplace = True)
 
     # Cleaning 'ID' column
     df['ID'] = df['ID'].astype('string')
@@ -408,7 +439,12 @@ def main():
         print("(4) Test model")
         print("(5) Quit")
 
-        option = int(input("\nSelect an option: "))
+        try:
+            option = int(input("\nSelect an option: "))
+        except ValueError:
+            print("\nInvalid option. Please enter a number.\n")
+            continue
+
         print()
 
         if option == 1:
@@ -426,15 +462,41 @@ def main():
             # sort files alphabetically
             csv_files.sort()
 
-            # print files in current directory
-            print("Available CSV files:")
-            print("********************")
+            while True:
+                count = 0
 
-            for i, file in enumerate(csv_files):
-                print(f"({i+1}) {file}")
+                # print files in current directory
+                print("Available CSV files:")
+                print("********************")
 
-            file_option = int(input("\nSelect a CSV file to load: "))
-            load_file = csv_files[file_option - 1]
+                for i, file in enumerate(csv_files):
+                    print(f"({i+1}) {file}")
+                    count += 1
+
+                print(f"({count+1}) exit to main menu")
+
+                try:
+                    file_option = int(input("\nSelect a CSV file to load or exit to main menu: "))
+
+                    if file_option < 1 or file_option > len(csv_files) + 1:
+                        raise IndexError(f"Invalid option. Please select an option from the list.")
+                    
+                    if file_option == count + 1:
+                        break
+
+                    load_file = csv_files[file_option - 1]
+                    break
+
+                except ValueError:
+                    print("\nInvalid option. Please enter a number.\n")
+                    continue
+                except IndexError as e:
+                    print(f"\n{e}\n")
+                    continue
+
+            if file_option == count + 1:
+                print("\nExiting to main menu....\n")
+                continue
 
             print("\nLoading input data set:")
             print("***********************")
@@ -445,6 +507,10 @@ def main():
             # Loading training data set
             start_time = Timestamp.now()
             df = loadData(load_file)
+
+            if len(df) == 0:
+                continue
+
             loading_time = (Timestamp.now() - start_time).total_seconds()
 
             # Displaying total columns read
@@ -466,6 +532,11 @@ def main():
 
             # Performing data clean up
             start_time = Timestamp.now()
+
+            if process_data:
+                print("\nThis dataset has already been processed.\n")
+                continue
+
             df = processData(df)
             cleaning_time = (Timestamp.now() - start_time).total_seconds()
             process_data = True
@@ -485,6 +556,10 @@ def main():
 
             print("Train NN:")
             print("********")
+
+            if trainNN:
+                print("\nModel has already been trained.\n")
+                continue
 
             X_train, X_test, y_tested, y_predicted, test_indices = trainNeuralNetwork(df)
             trainNN = True
