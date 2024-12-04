@@ -389,7 +389,7 @@ def trainNeuralNetwork(df):
               metrics=['accuracy'])
     
     # Train the model
-    model.fit(X_train, y_train, epochs = 50, batch_size = 25)
+    model.fit(X_train, y_train, epochs = 30, batch_size = 25)
 
     # Make Predictions
     predictions = model.predict(X_test)
