@@ -394,6 +394,9 @@ def trainNeuralNetwork(df):
     # Make Predictions
     predictions = model.predict(X_test)
 
+    # Calculate RMSE
+    rmse = math.sqrt(mean_squared_error(y_test, predictions))
+
     # Convert encoded target and predictions back to original values
     y_tested = encoder.inverse_transform(y_test)
     y_predicted = encoder.inverse_transform(predictions) 
@@ -403,6 +406,7 @@ def trainNeuralNetwork(df):
     print(f"\n[{Timestamp.now().strftime('%H:%M:%S')}] Model Accuracy: {metrics['accuracy']}")
     print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Precision: {metrics['precision']}")
     print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Recall: {metrics['recall']}")
+    print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model RMSE: {rmse}")
     print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model f1_score: {metrics['f1_score']}")
     print(f"[{Timestamp.now().strftime('%H:%M:%S')}] Model Confusion Matrix: {metrics['confusion_matrix']}\n")
 
@@ -434,9 +438,9 @@ def main():
     while option != 5:
         # Display the menu
         print("(1) Load data")
-        print("(2) Process data")
-        print("(3) Model details")
-        print("(4) Test model")
+        print("(2) Process (Clean) data")
+        print("(3) Train NN")
+        print("(4) Generate Predictions")
         print("(5) Quit")
 
         try:
